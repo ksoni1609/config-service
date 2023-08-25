@@ -1,0 +1,132 @@
+services:
+  zookeeper:
+    image: 'bitnami/zookeeper:latest'
+    ports:
+      - '2181:2181'
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+  kafka:
+    image: 'bitnami/kafka:latest'
+    ports:
+      - '9092:9092'
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    depends_on:
+      - zookeeper
+
+  config-service:
+    image: ksoni1609/config-service:srs1
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8071/actuator/health" ]
+      interval: 10s
+      timeout: 12s
+      retries: 3
+      start_period: 3s
+
+  discovery-service:
+    image: ksoni1609/discovery-service:srs1
+    ports:
+      - "8070:8070"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8070/actuator/health" ]
+      interval: 10s
+      timeout: 12s
+      retries: 3
+      start_period: 4s
+    depends_on:
+      config-service:
+        condition: service_healthy
+
+  gateway-service:
+    image: ksoni1609/gateway-service:srs1
+    ports:
+      - "8072:8072"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8072/actuator/health" ]
+      interval: 10s
+      timeout: 12s
+      retries: 3
+      start_period: 4s
+    depends_on:
+      config-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+
+  booking-service:
+    image: ksoni1609/booking-service:srs1
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8074/actuator/health" ]
+      interval: 10s
+      timeout: 12s
+      retries: 3
+      start_period: 4s
+    deploy:
+      mode: replicated
+      replicas: 1
+    depends_on:
+      config-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+      gateway-service:
+        condition: service_started
+
+  inventory-service:
+    image: ksoni1609/inventory-service:srs1
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8073/actuator/health" ]
+      interval: 10s
+      timeout: 12s
+      retries: 3
+      start_period: 4s
+    deploy:
+      mode: replicated
+      replicas: 1
+    depends_on:
+      config-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+      gateway-service:
+        condition: service_started
+
+  payment-service:
+    image: ksoni1609/payment-service:srs1
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8075/actuator/health" ]
+      interval: 10s
+      timeout: 12s
+      retries: 3
+      start_period: 4s
+    deploy:
+      mode: replicated
+      replicas: 1
+    depends_on:
+      config-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+      gateway-service:
+        condition: service_started
+
+  admin-service:
+    image: ksoni1609/admin-service:srs1
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8076/actuator/health" ]
+      interval: 10s
+      timeout: 12s
+      retries: 3
+      start_period: 4s
+    depends_on:
+      config-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+      gateway-service:
+        condition: service_started
